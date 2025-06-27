@@ -1,69 +1,98 @@
+# app.py
+
 import streamlit as st
-import pandas as pd
 import pickle
+import pandas as pd
 import requests
+import gdown
 import os
 
-# --- UI Title ---
-st.title('🎬 Cineplex: Movie Recommender System')
+# --- Page Config ---
+st.set_page_config(page_title="Cineplex", page_icon="🎥", layout="wide")
 
-# --- File Upload ---
-movie_dict_file = st.file_uploader("📁 Upload `movie_dict.pkl`", type="pkl")
-similarity_file = st.file_uploader("📁 Upload `similarity.pkl`", type="pkl")
+# --- Google Drive Auto Downloader ---
+def download_if_missing(file_name, file_id):
+    if not os.path.exists(file_name):
+        st.info(f"📥 Downloading {file_name}...")
+        url = f"https://drive.google.com/uc?id={file_id}"
+        gdown.download(url, file_name, quiet=False)
 
-if movie_dict_file is not None and similarity_file is not None:
-    # Load uploaded files
-    movies_dict = pickle.load(movie_dict_file)
-    similarity = pickle.load(similarity_file)
+# Google Drive file IDs (shared with view access)
+download_if_missing("movie_dict.pkl", "18FMqH7M3sCxq-1R2SOLzZhxYOIGV9Hf6")
+download_if_missing("similarity.pkl", "1q2TEo5-2XLxR4ThzSBa1rjmMwuRGfxNF")
+
+# --- Load Data ---
+try:
+    with open("movie_dict.pkl", "rb") as f:
+        movies_dict = pickle.load(f)
+
+    with open("similarity.pkl", "rb") as f:
+        similarity = pickle.load(f)
+
     movies = pd.DataFrame(movies_dict)
 
-    # --- Fetch Poster ---
-    def fetch_movie_details(movie_id):
+except Exception as e:
+    st.error(f"❌ Failed to load data: {e}")
+    st.stop()
+
+# --- Fetch Poster Function ---
+def fetch_movie_details(movie_id):
+    try:
         url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=9ae52b8e46198833207ecb2aeac44e63&language=en-US"
         response = requests.get(url)
-        if response.status_code != 200:
-            return "https://via.placeholder.com/300x450?text=No+Poster", "N/A", "No overview available"
+        response.raise_for_status()
         data = response.json()
-        poster_url = "https://image.tmdb.org/t/p/w500/" + data.get('poster_path', '') if data.get('poster_path') else "https://via.placeholder.com/300x450?text=No+Poster"
-        return poster_url, data.get('vote_average', 'N/A'), data.get('overview', 'No overview available')
 
-    # --- Recommend Function ---
-    def recommend(movie):
-        index = movies[movies['title'] == movie].index[0]
-        distances = similarity[index]
-        movie_list = sorted(list(enumerate(distances)), reverse=True, key=lambda x: x[1])[1:6]
+        poster_url = (
+            "https://image.tmdb.org/t/p/w500/" + data['poster_path']
+            if data.get('poster_path') else "https://via.placeholder.com/300x450?text=No+Poster"
+        )
+        rating = data.get('vote_average', 'N/A')
+        overview = data.get('overview', 'No description available.')
 
-        recommended_movies = []
-        recommended_posters = []
-        recommended_ratings = []
-        recommended_overviews = []
+        return poster_url, rating, overview
 
-        for i in movie_list:
-            movie_id = movies.iloc[i[0]].movie_id
-            title = movies.iloc[i[0]].title
-            poster, rating, overview = fetch_movie_details(movie_id)
+    except Exception as e:
+        print(f"[ERROR] Movie detail fetch failed for movie_id={movie_id}: {e}")
+        return "https://via.placeholder.com/300x450?text=Error", "N/A", "No description available."
 
-            recommended_movies.append(title)
-            recommended_posters.append(poster)
-            recommended_ratings.append(rating)
-            recommended_overviews.append(overview)
+# --- Recommend Function ---
+def recommend(movie):
+    index = movies[movies['title'] == movie].index[0]
+    distances = similarity[index]
+    movie_list = sorted(list(enumerate(distances)), reverse=True, key=lambda x: x[1])[1:6]
 
-        return recommended_movies, recommended_posters, recommended_ratings, recommended_overviews
+    recommended_movies = []
+    recommended_posters = []
+    recommended_ratings = []
+    recommended_overviews = []
 
-    # --- UI Input + Display ---
-    selected_movie_name = st.selectbox("Search for a movie:", movies['title'].values)
+    for i in movie_list:
+        movie_id = movies.iloc[i[0]].movie_id
+        title = movies.iloc[i[0]].title
+        poster, rating, overview = fetch_movie_details(movie_id)
 
-    if st.button("🚀 Recommend"):
-        with st.spinner("Finding top recommendations..."):
-            names, posters, ratings, overviews = recommend(selected_movie_name)
-            st.markdown("---")
-            cols = st.columns(5)
-            for i in range(5):
-                with cols[i]:
-                    st.image(posters[i], use_container_width=True)
-                    st.markdown(f"**{names[i]}**")
-                    st.markdown(f"⭐ {ratings[i]}")
-                    st.markdown(f"📝 {overviews[i][:100]}...")
+        recommended_movies.append(title)
+        recommended_posters.append(poster)
+        recommended_ratings.append(rating)
+        recommended_overviews.append(overview)
 
-else:
-    st.warning("⬆️ Please upload both `movie_dict.pkl` and `similarity.pkl` to continue.")
+    return recommended_movies, recommended_posters, recommended_ratings, recommended_overviews
+
+# --- UI Starts ---
+st.markdown("<h1 style='text-align: center; color: #e50914;'>🍿 Cineplex: Movie Recommender 🎬</h1>", unsafe_allow_html=True)
+st.markdown("### <span style='color:lightgray'>Search for a movie to get similar recommendations:</span>", unsafe_allow_html=True)
+
+selected_movie_name = st.selectbox(" ", movies['title'].values)
+
+if st.button("🚀 Recommend"):
+    with st.spinner("Fetching recommendations..."):
+        names, posters, ratings, overviews = recommend(selected_movie_name)
+        st.markdown("---")
+        cols = st.columns(5)
+        for i in range(5):
+            with cols[i]:
+                st.image(posters[i], use_container_width=True)
+                st.markdown(f"<h5 style='text-align: center; color: #fff;'>{names[i]}</h5>", unsafe_allow_html=True)
+                st.markdown(f"<p style='text-align: center; color: gold;'>⭐ {ratings[i]}</p>", unsafe_allow_html=True)
+                st.markdown(f"<p style='font-size: 12px; color: #ccc;'>{overviews[i][:150]}...</p>", unsafe_allow_html=True)
