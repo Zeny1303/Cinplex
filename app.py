@@ -89,13 +89,7 @@ if st.button("🚀 Recommend"):
     with st.spinner("Fetching recommendations..."):
         names, posters, ratings, overviews = recommend(selected_movie_name)
 
-        # ✅ Log to Firebase
-        db.collection("recommendations").add({
-            "input_movie": selected_movie_name,
-            "recommended": names,
-            "timestamp": firestore.SERVER_TIMESTAMP
-        })
-
+        
         st.markdown("---")
         cols = st.columns(5)
         for i in range(5):
@@ -104,4 +98,5 @@ if st.button("🚀 Recommend"):
                 st.markdown(f"<h5 style='text-align: center; color: #fff;'>{names[i]}</h5>", unsafe_allow_html=True)
                 st.markdown(f"<p style='text-align: center; color: gold;'>⭐ {ratings[i]}</p>", unsafe_allow_html=True)
                 st.markdown(f"<p style='font-size: 12px; color: #ccc;'>{overviews[i][:150]}...</p>", unsafe_allow_html=True)
+
 
