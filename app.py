@@ -7,35 +7,12 @@ import requests
 import gdown
 import os
 
-import firebase_admin
-from firebase_admin import credentials, firestore
+
 
 # --- Streamlit Config ---
 st.set_page_config(page_title="Cineplex", page_icon="🎥", layout="wide")
 
-# --- Firebase Initialization ---
-@st.cache_resource
-def init_firebase():
-    firebase_secrets = st.secrets["FIREBASE"]
-    private_key = firebase_secrets["FIREBASE_PRIVATE_KEY"].replace("\\n", "\n")
 
-    cred = credentials.Certificate({
-        "type": firebase_secrets["FIREBASE_TYPE"],
-        "project_id": firebase_secrets["FIREBASE_PROJECT_ID"],
-        "private_key_id": firebase_secrets["FIREBASE_PRIVATE_KEY_ID"],
-        "private_key": private_key,
-        "client_email": firebase_secrets["FIREBASE_CLIENT_EMAIL"],
-        "client_id": firebase_secrets["FIREBASE_CLIENT_ID"],
-        "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-        "token_uri": "https://oauth2.googleapis.com/token",
-        "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-        "client_x509_cert_url": firebase_secrets["FIREBASE_CLIENT_CERT_URL"]
-    })
-
-    firebase_admin.initialize_app(cred)
-    return firestore.client()
-
-db = init_firebase()
 
 # --- Download if missing from Google Drive ---
 def download_if_missing(file_name, file_id):
@@ -127,3 +104,4 @@ if st.button("🚀 Recommend"):
                 st.markdown(f"<h5 style='text-align: center; color: #fff;'>{names[i]}</h5>", unsafe_allow_html=True)
                 st.markdown(f"<p style='text-align: center; color: gold;'>⭐ {ratings[i]}</p>", unsafe_allow_html=True)
                 st.markdown(f"<p style='font-size: 12px; color: #ccc;'>{overviews[i][:150]}...</p>", unsafe_allow_html=True)
+
